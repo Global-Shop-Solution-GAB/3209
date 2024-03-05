@@ -1,0 +1,108 @@
+Program.Sub.ScreenSU.Start
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+
+Variable.UDT.uPOLine.Define("Term",String,Terminal)
+Variable.UDT.uPOLine.Define("Rptid",String,RPTID)
+Variable.UDT.uPOLine.Define("PONum",String,Purchase_Order)
+Variable.UDT.uPOLine.Define("Line",String,Line_Number)
+Variable.UDT.uPOLine.Define("QtyOrd",Float,Qty_Ordered)
+Variable.UDT.uPOLine.Define("UM",String,UM)
+Variable.UDT.uPOLine.Define("Part",String,Part)
+Variable.UDT.uPOLine.Define("Description",String,Description)
+Variable.UDT.uPOLine.Define("Price",Float,Price)
+Variable.UDT.uPOLine.Define("Extension",Float,Extension)
+Variable.UDT.uPOLine.Define("Key",String,Key_Seq)
+Variable.uGlobal.uPOLine.Declare("uPOLine")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Coded by: mla
+'Project Start Date: 12/6/2011
+'Hooks: 16090
+'Notes:
+'  C&B Piping
+'  Quote 2878
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+F.Intrinsic.Control.If(V.Passed.009001,=,"002801")
+	F.Intrinsic.Control.CallSub(Loadrst)
+F.Intrinsic.Control.Else
+	F.Intrinsic.Control.CallSub(Unload)
+F.Intrinsic.Control.EndIf
+
+Program.Sub.Main.End
+
+Program.Sub.Unload.Start
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+Program.Sub.Unload.End
+
+Program.Sub.LoadRST.Start
+F.Intrinsic.Control.SetErrorHandler("LoadRST_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+V.Local.iUB.Declare(Long)
+
+V.uGlobal.uPOLine.Redim(-1,-1)
+V.Local.iUB.Set(-1)
+F.Intrinsic.String.Concat("Delete GCG_3209_PO_Line_Des where Terminal = '",V.Caller.Terminal,"'",V.Local.sSql)
+F.ODBC.Connection!con.Execute(V.Local.sSql)
+F.Intrinsic.String.Concat("Select * from V_PRT_LASER_PO where LINE_TYPE = 'L' and RPTID = '002801' and TERMINAL_NO = '",V.Caller.Terminal,"' ORDER BY KEY_SEQ",V.Local.sSql)
+F.ODBC.Connection!con.OpenRecordsetRO("rst",V.Local.sSql)
+F.Intrinsic.Control.DoUntil(V.ODBC.con!rst.EOF,=,True)
+	F.Intrinsic.Control.If(V.ODBC.con!rst.FieldValTrim!Part,<>,"")
+		F.Intrinsic.Control.If(V.uGlobal.uPOLine.UBound,=,-1)
+			V.uGlobal.uPOLine.Redim(0,0)
+		F.Intrinsic.Control.EndIf
+		F.Intrinsic.Math.Add(V.Local.iUB,1,V.Local.iUB)
+		V.uGlobal.uPOLine.RedimPreserve(V.uGlobal.uPOLine.LBound,V.Local.iUB)
+		V.uGlobal.uPOLine(V.Local.iUB)!Term.Set(V.Caller.Terminal)
+		V.uGlobal.uPOLine(V.Local.iUB)!Rptid.Set("002801")
+		V.uGlobal.uPOLine(V.Local.iUB)!PONum.Set(V.ODBC.con!rst.FieldValTrim!PO_NO)
+		V.uGlobal.uPOLine(V.Local.iUB)!Line.Set(V.ODBC.con!rst.FieldValTrim!LINE_ITEM)
+		V.uGlobal.uPOLine(V.Local.iUB)!QtyOrd.Set(V.ODBC.con!rst.FieldValFloat!QTY_ORD_DEC)
+		V.uGlobal.uPOLine(V.Local.iUB)!UM.Set(V.ODBC.con!rst.FieldValTrim!UM)
+		V.uGlobal.uPOLine(V.Local.iUB)!Part.Set(V.ODBC.con!rst.FieldValTrim!PART)
+		V.uGlobal.uPOLine(V.Local.iUB)!Description.Set(V.ODBC.con!rst.FieldValTrim!DESCRIPTION)
+		V.uGlobal.uPOLine(V.Local.iUB)!Price.Set(V.ODBC.con!rst.FieldValFloat!PRICE_2)
+		V.uGlobal.uPOLine(V.Local.iUB)!Extension.Set(V.ODBC.con!rst.FieldValFloat!NET_AMT)
+		V.uGlobal.uPOLine(V.Local.iUB)!Key.Set(V.ODBC.con!rst.FieldValTrim!KEY_SEQ)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.Control.If(V.uGlobal.uPOLine(V.Local.iUB)!Description,=,"")
+			V.uGlobal.uPOLine(V.Local.iUB)!Description.Set(V.ODBC.con!rst.FieldValTrim!DESCRIPTION)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Concat(V.uGlobal.uPOLine(V.Local.iUB)!Description,V.Ambient.NewLine,V.ODBC.con!rst.FieldValTrim!DESCRIPTION,V.uGlobal.uPOLine(V.Local.iUB)!Description)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+	F.ODBC.con!rst.MoveNext
+F.Intrinsic.Control.Loop
+F.ODBC.con!rst.Close
+F.Intrinsic.Control.If(V.uGlobal.uPOLine.UBound,>,-1)
+	V.Local.sSql.Set("Select * from GCG_3209_PO_Line_Des")
+	F.ODBC.Connection!con.OpenRecordsetRW("rst",V.Local.sSql)
+	F.Intrinsic.Variable.SaveUDTToRecordset("con","rst","Variable.uGlobal.uPOLine")
+	F.ODBC.con!rst.Close
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.CallSub(Unload)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("LoadRST_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_PO_Line_Description.gas",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+Function.Intrinsic.Control.EndIf
+
+
+
+Program.Sub.LoadRST.End
+
+
+
+Program.Sub.Comments.Start
+${$0$}$$}$$}$12:00:00 AM$}$False
+Program.Sub.Comments.End
